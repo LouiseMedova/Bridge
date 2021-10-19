@@ -90,12 +90,12 @@ describe('Contract: Bridge', () => {
 			await bridge.redeem(owner.address, user0.address, amount,nonce, hash, signature);
 
 			await expect(
-                bridge
-                    .redeem(owner.address, user0.address, amount,nonce, hash, signature)
-            )
-                .to
-                .be
-                .revertedWith('redeem has already been done')			
+				bridge
+				    .redeem(owner.address, user0.address, amount,nonce, hash, signature)
+			    )
+				.to
+				.be
+				.revertedWith('redeem has already been done')			
 		})
 
 		it('should revert if validator is wrong', async () => {
@@ -107,12 +107,12 @@ describe('Contract: Bridge', () => {
 			const signature = await web3.eth.sign(hash , owner.address);
 			
 			await expect(
-                bridge
-                    .redeem(user0.address, user0.address, amount,nonce, hash, signature)
-            )
-                .to
-                .be
-                .revertedWith('wrong validator')			
+				bridge
+				    .redeem(user0.address, user0.address, amount,nonce, hash, signature)
+			    )
+				.to
+				.be
+				.revertedWith('wrong validator')			
 		})
 	})
 })
