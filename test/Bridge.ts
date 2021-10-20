@@ -14,105 +14,176 @@ import { Bridge, Token } from '../typechain'
 
 let bridge: Bridge
 let token: Token
-
 let owner: SignerWithAddress
-let user0: SignerWithAddress
-let user1: SignerWithAddress
+let user: SignerWithAddress
 
-async function reDeploy() {
-	[owner, user0, user1] = await ethers.getSigners()
+const chainFrom = 4;
+const chainTo = 97;
 
-	let Token = await ethers.getContractFactory('Token')
-	token = await Token.deploy('My Custom Token', 'MCT') as Token
-
-	let Bridge = await ethers.getContractFactory('Bridge')
-	bridge = await Bridge.deploy(token.address) as Bridge
-
-	const minter = "MINTER";
-	const minterRole = web3.utils.keccak256(minter)
-	const burner = "BURNER";
-	const burnerRole = web3.utils.keccak256(burner)
-	await token.grantRole(minterRole, bridge.address)
-	await token.grantRole(burnerRole, bridge.address)
-
-	await token.grantRole(minterRole, owner.address)
-	await token.grantRole(burnerRole, owner.address)
-
-	await token.mint(user0.address, 10000)
-	
-}
 
 describe('Contract: Bridge', () => {
-	describe('test initSwap', () => {
-		it('should burn tokens and emit event', async () => {
-			await reDeploy();
-			const initialBalance = await token.balanceOf(user0.address);
-			const nonce = 1;
-			const amount = 1000;
-			const message = web3.eth.abi.encodeParameters(['uint256','uint256', 'string'], [amount,nonce, user0.address]);
-			const signature = await web3.eth.sign(message , owner.address);
-			
-			await expect(bridge.initSwap(user0.address, amount, nonce, signature))
-					.to.emit(bridge, 'InitSwap')
-					.withArgs(owner.address,signature, user0.address,amount,nonce);
+	
+	beforeEach(async () => {
+		[owner, user] = await ethers.getSigners()
+		let Token = await ethers.getContractFactory('Token')
+		token = await Token.deploy('My Custom Token', 'MCT') as Token
 
-			const finalBalance = await token.balanceOf(user0.address);
-			expect(initialBalance.sub(finalBalance)).to.to.equal(new BigNumber('1000').toString())					
+		let Bridge = await ethers.getContractFactory('Bridge')
+		bridge = await Bridge.deploy(token.address, chainFrom) as Bridge
+
+		await bridge.setChainId(chainTo, true)
+
+		const minter = web3.utils.keccak256("MINTER")
+		const burner = web3.utils.keccak256("BURNER")
+		const validator = web3.utils.keccak256("VALIDATOR")
+		await token.grantRole(minter, bridge.address)
+		await token.grantRole(burner, bridge.address)
+
+		await token.grantRole(minter, owner.address)
+		await token.grantRole(burner, owner.address)
+
+		await bridge.grantRole(validator, owner.address)
+
+		await token.mint(user.address, 10000000)
+
+	});
+	describe('test initSwap', () => {
+		it('should create swap with SWAP status and emit event', async () => {
+			const nonce = 1;
+			const amount = 10000;		
+			const message = web3.utils.keccak256(web3.eth.abi.encodeParameters(
+				['uint256','uint256','address','address','uint256','uint256'],
+				[chainFrom, chainTo, owner.address, user.address, amount, nonce]))
+			const signature = await web3.eth.sign(message, owner.address);			
+			await expect(bridge.initSwap(
+				chainFrom, 
+				chainTo,
+				user.address, 
+				amount, 
+				nonce, 
+				signature))
+				.to.emit(bridge, 'InitSwap')
+				.withArgs(
+					chainFrom, 
+					chainTo,
+					owner.address,
+					user.address,
+					amount,
+					nonce,
+					signature);
+			
+			const swap = await bridge.swaps(message);
+			expect(swap.status).to.equal(1);
+		})
+	
+		it('should revert if the swap is not empty', async() => {
+			const nonce = 1;
+			const amount = 10000;		
+			const message = web3.utils.keccak256(web3.eth.abi.encodeParameters(
+				['uint256','uint256','address','address','uint256','uint256'],
+				[chainFrom, chainTo, owner.address, user.address, amount, nonce]))
+			const signature = await web3.eth.sign(message, owner.address);			
+			await bridge.initSwap(
+				chainFrom, 
+				chainTo,
+				user.address, 
+				amount, 
+				nonce, 
+				signature);
+
+			await expect(
+				bridge.initSwap(
+					chainFrom, 
+					chainTo,
+					user.address, 
+					amount, 
+					nonce, 
+					signature))
+				.to
+				.be
+				.revertedWith('swap status must be EMPTY')			
 		})
 	})
 
 	describe('test redeem', () => {
-		it('should mint tokens and emit event', async () => {
-			await reDeploy();
-			const initialBalance = await token.balanceOf(user0.address);
+		it('should create swap with REDEEM status and emit event', async () => {
 			const nonce = 1;
-			const amount = 1000;
-			const message = web3.eth.abi.encodeParameters(['uint256','uint256', 'string'], [amount,nonce, user0.address]);
-			const hash = web3.utils.keccak256(message)
-			const signature = await web3.eth.sign(hash , owner.address);
+			const amount = 10000;		
+			const message = web3.utils.keccak256(web3.eth.abi.encodeParameters(
+				['uint256','uint256','address','address','uint256','uint256'],
+				[chainFrom, chainTo, owner.address, user.address, amount, nonce]))
+			const signature = await web3.eth.sign(message, owner.address);			
+			await expect(bridge.redeem(
+				chainFrom,
+				chainTo, 
+				owner.address,
+				user.address, 
+				amount, 
+				nonce, 
+				signature))
+				.to.emit(bridge, 'Redeem')
+				.withArgs(
+					chainFrom, 
+					chainTo,
+					owner.address,
+					user.address,
+					amount,
+					nonce);
 			
-			await expect(bridge.redeem(owner.address, user0.address, amount, nonce, hash, signature))
-					.to.emit(bridge, 'Redeem')
-					.withArgs(owner.address,signature, user0.address,amount,nonce);
+			const swap = await bridge.swaps(message);
+			expect(swap.status).to.equal(2);
+		 })
 
-			const finalBalance = await token.balanceOf(user0.address);
-			expect(finalBalance.sub(initialBalance)).to.to.equal(new BigNumber('1000').toString())					
-		})
-
-		it('should revert if redeem was done', async () => {
-			await reDeploy();
+		it('should revert if the swap is not empty', async () => {
 			const nonce = 1;
-			const amount = 1000;
-			const message = web3.eth.abi.encodeParameters(['uint256','uint256', 'string'], [amount,nonce, user0.address]);
-			const hash = web3.utils.keccak256(message)
-			const signature = await web3.eth.sign(hash , owner.address);
+			const amount = 10000;		
+			const message = web3.utils.keccak256(web3.eth.abi.encodeParameters(
+				['uint256','uint256','address','address','uint256','uint256'],
+				[chainFrom, chainTo, owner.address, user.address, amount, nonce]))
+			const signature = await web3.eth.sign(message, owner.address);	
 			
-			await bridge.redeem(owner.address, user0.address, amount,nonce, hash, signature);
-
 			await expect(
-                bridge
-                    .redeem(owner.address, user0.address, amount,nonce, hash, signature)
-            )
-                .to
-                .be
-                .revertedWith('redeem has already been done')			
+				bridge.redeem(
+					chainFrom, 
+					chainTo,
+					user.address,
+					user.address, 
+					amount, 
+					nonce, 
+					signature))
+				.to
+				.be
+				.revertedWith('wrong validator')			
 		})
 
 		it('should revert if validator is wrong', async () => {
-			await reDeploy();
 			const nonce = 1;
-			const amount = 1000;
-			const message = web3.eth.abi.encodeParameters(['uint256','uint256', 'string'], [amount,nonce, user0.address]);
-			const hash = web3.utils.keccak256(message)
-			const signature = await web3.eth.sign(hash , owner.address);
+			const amount = 10000;		
+			const message = web3.utils.keccak256(web3.eth.abi.encodeParameters(
+				['uint256','uint256','address','address','uint256','uint256'],
+				[chainFrom, chainTo, owner.address, user.address, amount, nonce]))
+			const signature = await web3.eth.sign(message, owner.address);
+			bridge.redeem(
+				chainFrom, 
+				chainTo,
+				owner.address,
+				user.address, 
+				amount, 
+				nonce, 
+				signature)
 			
 			await expect(
-                bridge
-                    .redeem(user0.address, user0.address, amount,nonce, hash, signature)
-            )
-                .to
-                .be
-                .revertedWith('wrong validator')			
+				bridge.redeem(
+					chainFrom, 
+					chainTo,
+					owner.address,
+					user.address, 
+					amount, 
+					nonce, 
+					signature))
+				.to
+				.be
+				.revertedWith('swap status must be EMPTY')						
 		})
 	})
 })
