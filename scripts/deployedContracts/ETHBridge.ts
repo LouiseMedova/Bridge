@@ -1,0 +1,1 @@
+export const bridge = {"address":"0x318fF64f083CACF7F91E6f5Ee74Ad095baC79d3F","chainId":4}

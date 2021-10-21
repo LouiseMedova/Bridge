@@ -2,16 +2,17 @@
 pragma solidity 0.8.6;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import './Token.sol';
 
-contract Bridge is AccessControl{
+contract Bridge is AccessControl, ReentrancyGuard{
 
     bytes32 public constant ADMIN = keccak256("ADMIN");
     bytes32 public constant VALIDATOR = keccak256("VALIDATOR");
 
     address public addressOfToken;
     uint public chainId;
-    mapping (bytes32 => Swap) public swaps;
+    mapping (bytes32 => Status) public swaps;
     mapping(uint => bool) public chainList;
 
     constructor(address _addressOfToken, uint _chainId) {
@@ -20,17 +21,6 @@ contract Bridge is AccessControl{
         chainList[_chainId] = true;
         _setupRole(ADMIN, msg.sender);
         _setRoleAdmin(VALIDATOR, ADMIN);
-    }
-
-
-    struct Swap {
-        uint chainFrom;
-        uint chainTo;
-        address validator;
-        address owner;
-        uint nonce;
-        uint amount;
-        Status status;
     }
 
     enum Status {
@@ -42,7 +32,6 @@ contract Bridge is AccessControl{
     event InitSwap (
         uint chainFrom,
         uint chainTo,
-        address validator,
         address owner,
         uint amount,
         uint nonce,
@@ -53,7 +42,7 @@ contract Bridge is AccessControl{
         uint chainFrom,
         uint chainTo,
         address validator,
-        address owner,
+        address recipient,
         uint amount,
         uint nonce
     );
@@ -80,37 +69,32 @@ contract Bridge is AccessControl{
     /// @dev Burns the user's tokens and emits an {InitSwap} event indicating the swap
     /// @param _chainFrom Chain ID from which tokens are transferred (it must be chainId)
     /// @param _chainTo Chain ID to which tokens are transferred (it must be in chainList)
-    /// @param _owner The user address executing the swap
     /// @param _amount The amount of tokens to be swaped
     /// @param _nonce The transaction identifier
     /// @param _signature The signature of validator
     function initSwap(
         uint _chainFrom, 
         uint _chainTo, 
-        address _owner, 
         uint _amount, 
         uint _nonce,
         bytes memory _signature
-        ) onlyRole(VALIDATOR)
-          onlyChainId(_chainFrom)
+        ) onlyChainId(_chainFrom)
           onlyAllowedChainId(_chainTo)
-          public {
+          external {
             bytes32 hash = keccak256(abi.encode(
                 _chainFrom, 
                 _chainTo,
                 msg.sender,
-                _owner,
                 _amount,
                 _nonce
                 ));
-            require(swaps[hash].status == Status.EMPTY, 'swap status must be EMPTY');
-            swaps[hash] = Swap(_chainFrom, _chainTo, msg.sender, _owner, _nonce, _amount, Status.SWAP);
-            Token(addressOfToken).burn(_owner, _amount);
+            require(swaps[hash] == Status.EMPTY, 'swap status must be EMPTY');
+            swaps[hash] =  Status.SWAP;
+            Token(addressOfToken).burn(msg.sender, _amount);
             emit InitSwap (
                 _chainFrom,
                 _chainTo,
                 msg.sender,
-                _owner,
                 _amount,
                 _nonce,
                 _signature
@@ -122,42 +106,40 @@ contract Bridge is AccessControl{
     /// @dev Emits an {Redeem} event indicating the token redemption
     /// @param _chainFrom Chain ID from which tokens are transferred (it must be in chainList)
     /// @param _chainTo Chain ID to which tokens are transferred (it must be chainId)
-    /// @param _validator The address of validator
-    /// @param _owner The user address executing the swap
+    /// @param _recipient The user address executing the swap
     /// @param _amount The amount of tokens to be swaped
     /// @param _nonce The transaction identifier
     /// @param _signature The signature of validator
     function redeem(
         uint _chainFrom, 
         uint _chainTo,  
-        address _validator, 
-        address _owner, 
+        address _recipient, 
         uint _amount, 
         uint _nonce, 
         bytes memory _signature
-        ) onlyRole(VALIDATOR)
-          onlyChainId(_chainFrom)
-          onlyAllowedChainId(_chainTo)
-          public {
+        ) nonReentrant
+          onlyRole(VALIDATOR)
+          onlyChainId(_chainTo)
+          onlyAllowedChainId(_chainFrom)
+          external {
               bytes32 hash = keccak256(abi.encode(
                 _chainFrom, 
                 _chainTo,
-                msg.sender,
-                _owner,
+                _recipient,
                 _amount,
                 _nonce
                 ));
-            require(swaps[hash].status == Status.EMPTY, 'swap status must be EMPTY');
+            require(swaps[hash] == Status.EMPTY, 'swap status must be EMPTY');
             bytes32 _hashToEth = ECDSA.toEthSignedMessageHash(hash);
             address validator = ECDSA.recover(_hashToEth, _signature);
-            require(validator == _validator, 'wrong validator');
-            Token(addressOfToken).mint(_owner, _amount);
-            swaps[hash].status = Status.REDEEM;
+            require(hasRole(VALIDATOR, validator), 'wrong validator');
+            Token(addressOfToken).mint(_recipient, _amount);
+            swaps[hash] = Status.REDEEM;
             emit Redeem (
                 _chainFrom,
                 _chainTo,
-                _validator,
-                _owner,
+                validator,
+                _recipient,
                 _amount,
                 _nonce
             );

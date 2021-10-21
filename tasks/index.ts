@@ -1,1 +1,1 @@
-import './getBalanceByAddress'
+import './bridge'
