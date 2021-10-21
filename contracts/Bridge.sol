@@ -18,7 +18,6 @@ contract Bridge is AccessControl, ReentrancyGuard{
     constructor(address _addressOfToken, uint _chainId) {
         addressOfToken = _addressOfToken;
         chainId = _chainId;
-        chainList[_chainId] = true;
         _setupRole(ADMIN, msg.sender);
         _setRoleAdmin(VALIDATOR, ADMIN);
     }
