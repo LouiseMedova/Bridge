@@ -1,5 +1,4 @@
 import { task } from 'hardhat/config'
-import BigNumber from "bignumber.js"
 
 task('swap', 'init swap')
 	.addParam('bridge', 'Bridge address')
@@ -9,17 +8,7 @@ task('swap', 'init swap')
 	.addParam('nonce', 'The transaction identifier')
 	.addParam('signature', 'The signature of validator')
 	.setAction(async ({ bridge, chainfrom, chainto,  amount, nonce, signature}, { ethers }) => {
-		console.log('bridge address', bridge);
-		console.log('chainfrom', chainfrom);
-		console.log('chainto', chainto);
-		console.log('amount', amount);
-		console.log('nonce', nonce);
-		console.log('signature', signature);
-		
-		
-		
 		const contract = await ethers.getContractAt('Bridge', bridge)
-		
 		await contract.initSwap(
 			chainfrom,
 			chainto,
@@ -38,15 +27,7 @@ task('redeem', 'redeem tokens')
 .addParam('nonce', 'The transaction identifier')
 .addParam('signature', 'The signature of validator')
 .setAction(async ({ bridge, chainfrom, chainto, recipient, amount, nonce, signature}, { ethers }) => {
-	console.log('bridge address', bridge);
-	console.log('chainfrom', chainfrom);
-	console.log('chainto', chainto);
-	console.log('amount', amount);
-	console.log('nonce', nonce);
-	console.log('signature', signature);
-	
-	const contract = await ethers.getContractAt('Bridge', bridge)
-	
+	const contract = await ethers.getContractAt('Bridge', bridge)	
 	await contract.redeem(
 		chainfrom,
 		chainto,
@@ -82,13 +63,4 @@ task('setRole','Set role for bridge contract')
 .setAction(async ({ token, bridge, role }, {ethers}) => {
 	const contract = await ethers.getContractAt('Token', token);
 	await contract.grantRole(role, bridge)
-})
-
-task('setValidator','Set validator role')
-.addParam('bridge', 'Bridge address')
-.addParam('user', 'User address')
-.addParam('role', 'keccak256 of the role')
-.setAction(async ({ user, bridge, role }, {ethers}) => {
-	const contract = await ethers.getContractAt('Bridge', bridge);
-	await contract.grantRole(role, user)
 })
