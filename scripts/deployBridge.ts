@@ -8,7 +8,7 @@ async function deployBridge() {
 	
 	const envConfig = dotenv.parse(fs.readFileSync(".env-"+network.name))
 	for (const k in envConfig) {
-	process.env[k] = envConfig[k]
+		process.env[k] = envConfig[k]
 	}
 	const token = process.env.TOKEN_ADDRESS as string;	
 	const chainId = process.env.CHAIN_ID as string;
