@@ -9,28 +9,29 @@ const chainIds: {[key:string]: number} = {
 	hardhat: 31337,
 	kovan: 42,
 	mainnet: 1,
+	bsc_testnet: 97,
 	rinkeby: 4,
 	ropsten: 3
   }
-  
+
 task('swap', 'init swap')
-	.addParam('chainfrom', 'Chain ID from which tokens are transferred')
-	.addParam('chainto', 'Chain ID to which tokens are transferred')
+	.addParam('chainfrom', 'Chain name from which tokens are transferred')
+	.addParam('chainto', 'Chain name to which tokens are transferred')
 	.addParam('recipient', 'The address of user receiving the tokens')
 	.addParam('amount', 'The amount of tokens to be swaped')
 	.addParam('nonce', 'The transaction identifier')
 	.addParam('signature', 'The signature of validator')
 	.setAction(async ({ chainfrom, chainto, recipient, amount, nonce, signature}, { ethers }) => {
-		const network = chainIds[chainfrom]
-		const envConfig = dotenv.parse(fs.readFileSync(".env-"+network))
+
+		const envConfig = dotenv.parse(fs.readFileSync(".env-"+chainfrom))
 		for (const k in envConfig) {
 			process.env[k] = envConfig[k]
 		}
 		const bridge = process.env.BRIDGE_ADDRESS as string;
 		const contract = await ethers.getContractAt('Bridge', bridge)
 		await contract.initSwap(
-			chainfrom,
-			chainto,
+			chainIds[chainfrom],
+			chainIds[chainto],
 			recipient,
 			amount,
 			nonce,
@@ -39,24 +40,23 @@ task('swap', 'init swap')
 	})
 
 task('redeem', 'redeem tokens')
-.addParam('chainfrom', 'Chain ID from which tokens are transferred')
-.addParam('chainto', 'Chain ID to which tokens are transferred')
+.addParam('chainfrom', 'Chain name from which tokens are transferred')
+.addParam('chainto', 'Chain name to which tokens are transferred')
 .addParam('sender', 'The user address executing the swap')
 .addParam('recipient', 'The user address executing the swap')
 .addParam('amount', 'The amount of tokens to be swaped')
 .addParam('nonce', 'The transaction identifier')
 .addParam('signature', 'The signature of validator')
 .setAction(async ({ chainfrom, chainto, sender, recipient, amount, nonce, signature}, { ethers }) => {
-	const network = chainIds[chainto]
-	const envConfig = dotenv.parse(fs.readFileSync(".env-"+network))
+	const envConfig = dotenv.parse(fs.readFileSync(".env-"+chainto))
 	for (const k in envConfig) {
 		process.env[k] = envConfig[k]
 	}
 	const bridge = process.env.BRIDGE_ADDRESS as string;
 	const contract = await ethers.getContractAt('Bridge', bridge)	
 	await contract.redeem(
-		chainfrom,
-		chainto,
+		chainIds[chainfrom],
+		chainIds[chainto],
 		sender,
 		recipient,
 		amount,
@@ -66,11 +66,10 @@ task('redeem', 'redeem tokens')
 })
 
 task('getBalance', 'get balance of user')
-.addParam('chainid', 'Chain ID')
+.addParam('chain', 'Chain name')
 .addParam('user', 'User address')
-.setAction(async ({ chainid, user}, { ethers }) => {
-	const network = chainIds[chainid]
-	const envConfig = dotenv.parse(fs.readFileSync(".env-"+network))
+.setAction(async ({ chain, user}, { ethers }) => {
+	const envConfig = dotenv.parse(fs.readFileSync(".env-"+chain))
 	for (const k in envConfig) {
 		process.env[k] = envConfig[k]
 	}
@@ -81,25 +80,24 @@ task('getBalance', 'get balance of user')
 })
 
 task('setChainId','Set Chain ID to which bridge can connect')
-	.addParam('chainid', 'Chain ID')
-	.addParam('chain_allowed', 'Chain ID to which tokens are transferred')
+	.addParam('chain', 'Chain name')
+	.addParam('chainallowed', 'Chain name to which tokens are transferred')
 	.addParam('bool', 'allows or denies the connection to the Chain ID')
-	.setAction(async ({ chainid, chain_allowed, bool }, {ethers}) => {
-		const network = chainIds[chainid]
-		const envConfig = dotenv.parse(fs.readFileSync(".env-"+network))
+	.setAction(async ({ chain, chainallowed, bool }, {ethers}) => {
+		const envConfig = dotenv.parse(fs.readFileSync(".env-"+chain))
 		for (const k in envConfig) {
 			process.env[k] = envConfig[k]
 		}
 		const bridge = process.env.BRIDGE_ADDRESS as string;
 		const contract = await ethers.getContractAt('Bridge', bridge);
-		await contract.setChainId(chain_allowed,bool);
+		await contract.setChainId(chainIds[chainallowed],bool);
 	})
 
 task('setRole','Set role for bridge contract')
-	.addParam('chainid', 'Chain ID')
+	.addParam('chain', 'Chain name')
 	.addParam('role', 'keccak256 of the role')
-	.setAction(async ({ chainid, role }, {ethers}) => {
-		const envConfig = dotenv.parse(fs.readFileSync(".env-"+network))
+	.setAction(async ({ chain, role }, {ethers}) => {
+		const envConfig = dotenv.parse(fs.readFileSync(".env-"+chain))
 			for (const k in envConfig) {
 				process.env[k] = envConfig[k]
 			}
