@@ -31,7 +31,8 @@ contract Bridge is AccessControl, ReentrancyGuard{
     event InitSwap (
         uint chainFrom,
         uint chainTo,
-        address owner,
+        address sender,
+        address recipient,
         uint amount,
         uint nonce,
         bytes signature
@@ -40,7 +41,7 @@ contract Bridge is AccessControl, ReentrancyGuard{
     event Redeem (
         uint chainFrom,
         uint chainTo,
-        address validator,
+        address sender,
         address recipient,
         uint amount,
         uint nonce
@@ -68,12 +69,14 @@ contract Bridge is AccessControl, ReentrancyGuard{
     /// @dev Burns the user's tokens and emits an {InitSwap} event indicating the swap
     /// @param _chainFrom Chain ID from which tokens are transferred (it must be chainId)
     /// @param _chainTo Chain ID to which tokens are transferred (it must be in chainList)
+    /// @param _recipient The address of the user receiving tokens on the _chainTo
     /// @param _amount The amount of tokens to be swaped
     /// @param _nonce The transaction identifier
     /// @param _signature The signature of validator
     function initSwap(
         uint _chainFrom, 
-        uint _chainTo, 
+        uint _chainTo,
+        address _recipient, 
         uint _amount, 
         uint _nonce,
         bytes memory _signature
@@ -84,6 +87,7 @@ contract Bridge is AccessControl, ReentrancyGuard{
                 _chainFrom, 
                 _chainTo,
                 msg.sender,
+                _recipient,
                 _amount,
                 _nonce
                 ));
@@ -94,6 +98,7 @@ contract Bridge is AccessControl, ReentrancyGuard{
                 _chainFrom,
                 _chainTo,
                 msg.sender,
+                _recipient,
                 _amount,
                 _nonce,
                 _signature
@@ -105,25 +110,27 @@ contract Bridge is AccessControl, ReentrancyGuard{
     /// @dev Emits an {Redeem} event indicating the token redemption
     /// @param _chainFrom Chain ID from which tokens are transferred (it must be in chainList)
     /// @param _chainTo Chain ID to which tokens are transferred (it must be chainId)
-    /// @param _recipient The user address executing the swap
+    /// @param _sender The address of the user having sended tokens from `_chainFrom`
+    /// @param _recipient The address of the user receiving tokens on `_chainTo`
     /// @param _amount The amount of tokens to be swaped
     /// @param _nonce The transaction identifier
     /// @param _signature The signature of validator
     function redeem(
         uint _chainFrom, 
         uint _chainTo,  
+        address _sender,
         address _recipient, 
         uint _amount, 
         uint _nonce, 
         bytes memory _signature
         ) nonReentrant
-          onlyRole(VALIDATOR)
           onlyChainId(_chainTo)
           onlyAllowedChainId(_chainFrom)
           external {
               bytes32 hash = keccak256(abi.encode(
                 _chainFrom, 
                 _chainTo,
+                _sender,
                 _recipient,
                 _amount,
                 _nonce
@@ -137,7 +144,7 @@ contract Bridge is AccessControl, ReentrancyGuard{
             emit Redeem (
                 _chainFrom,
                 _chainTo,
-                validator,
+                _sender,
                 _recipient,
                 _amount,
                 _nonce
