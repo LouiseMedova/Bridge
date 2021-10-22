@@ -1,1 +1,0 @@
-export const token = {"address":"0xf32aa2D11A01682Bf4E93067D327a9C4FbF0CcB7","chainId":4}
