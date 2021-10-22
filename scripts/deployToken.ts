@@ -2,9 +2,6 @@ import {Token } from '../typechain'
 import {ethers, run} from 'hardhat'
 import {delay} from '../utils'
 
-const fs = require('fs');
-const chainId = 4
-
 async function deployToken() {
 	const Token = await ethers.getContractFactory('Token')
 	console.log('starting deploying token...')
@@ -25,11 +22,7 @@ async function deployToken() {
 	} catch (e: any) {
 		console.log(e.message)
 	}
-	const data = {
-		address: token.address,
-		chainId: chainId
-	  };
-	  fs.writeFileSync(`scripts/deployedContracts/ETHToken.ts`, 'export const token = ' + JSON.stringify(data)); 
+
 }
 
 deployToken()

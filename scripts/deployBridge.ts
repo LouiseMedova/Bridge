@@ -1,15 +1,20 @@
 import { Bridge } from '../typechain'
-import {ethers, run} from 'hardhat'
+import {ethers, network, run} from 'hardhat'
 import {delay} from '../utils'
-import { token } from './deployedContracts/BSCToken'
+import { dotenv, fs } from "./imports";
 
-const fs = require('fs');
-const chainId = 97
-
-async function deployCustomToken() {
+async function deployBridge() {
 	const Bridge = await ethers.getContractFactory('Bridge')
+	
+	const envConfig = dotenv.parse(fs.readFileSync(".env-"+network.name))
+	for (const k in envConfig) {
+	process.env[k] = envConfig[k]
+	}
+	const token = process.env.TOKEN_ADDRESS as string;	
+	const chainId = process.env.CHAIN_ID as string;
+
 	console.log('starting deploying bridge...')
-	const bridge = await Bridge.deploy(token.address, chainId) as Bridge
+	const bridge = await Bridge.deploy(token, chainId) as Bridge
 	console.log('Bridge deployed with address: ' + bridge.address)
 	console.log('wait of deploying...')
 	await bridge.deployed()
@@ -20,20 +25,15 @@ async function deployCustomToken() {
 		await run('verify:verify', {
 			address: bridge!.address,
 			contract: 'contracts/Bridge.sol:Bridge',
-			constructorArguments: [ token.address, chainId ],
+			constructorArguments: [ token, chainId ],
 		});
 		console.log('verify success')
 	} catch (e: any) {
 		console.log(e.message)
 	}
-	const data = {
-		address: bridge.address,
-		chainId: chainId
-	  };
-	  fs.writeFileSync(`scripts/deployedContracts/BSCBridge.ts`, 'export const bridge = ' + JSON.stringify(data)); 
 }
 
-deployCustomToken()
+deployBridge()
 .then(() => process.exit(0))
 .catch(error => {
 	console.error(error)
